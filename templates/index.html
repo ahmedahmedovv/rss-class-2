@@ -260,32 +260,72 @@
                 .replace(/'/g, '&apos;');
         }
 
+        function sanitizeText(text) {
+            if (!text) return '';
+            
+            return text
+                .toString()
+                .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;')
+                .trim();
+        }
+
         function downloadAsRss(className, elements) {
+            // Clear console
+            console.clear();
+            
+            console.group(`📦 Generating RSS feed for class: ${className}`);
+            console.log('🔍 Number of elements:', elements.length);
+            
             try {
                 const pubDate = new Date().toUTCString();
-                const pageUrl = document.getElementById('urlInput').value;
+                console.log('📅 Publication date:', pubDate);
                 
+                const pageUrl = sanitizeText(document.getElementById('urlInput').value);
+                console.log('🔗 Page URL:', pageUrl);
+
+                console.group('📝 Processing elements:');
+                elements.forEach((element, index) => {
+                    console.log(`\n🔸 Element ${index + 1}:`);
+                    console.log('   Title:', element.text);
+                    console.log('   Link:', element.link || 'No link');
+                });
+                console.groupEnd();
+
                 const rssContent = `<?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0">
     <channel>
-        <title>Class Content: ${escapeXml(className)}</title>
-        <link>${escapeXml(pageUrl)}</link>
-        <description>Content found for class '${escapeXml(className)}'</description>
+        <title>Class Content: ${sanitizeText(className)}</title>
+        <link>${pageUrl}</link>
+        <description>Content found for class '${sanitizeText(className)}'</description>
         <language>en-us</language>
         <pubDate>${pubDate}</pubDate>
         <lastBuildDate>${pubDate}</lastBuildDate>
         <generator>Class Content Extractor</generator>
         
-        ${elements.map((element, index) => `
+        ${elements.map((element, index) => {
+            if (!element.text) {
+                console.warn(`⚠️ Skipping empty element at index ${index}`);
+                return '';
+            }
+            
+            return `
         <item>
-            <title>${escapeXml(element.text)}</title>
-            <link>${escapeXml(element.link)}</link>
-            <description>${escapeXml(element.text)}</description>
-            <guid isPermaLink="true">${escapeXml(element.link)}</guid>
+            <title>${sanitizeText(element.text)}</title>
+            <link>${sanitizeText(element.link)}</link>
+            <description>${sanitizeText(element.text)}</description>
+            <guid isPermaLink="true">${sanitizeText(element.link || `item-${className}-${index}-${Date.now()}`)}</guid>
             <pubDate>${pubDate}</pubDate>
-        </item>`).join('\n        ')}
+        </item>`;
+        }).filter(item => item).join('\n        ')}
     </channel>
 </rss>`;
+
+                console.log('\n📤 Creating download...');
                 
                 // Create and trigger download
                 const blob = new Blob([rssContent], { 
@@ -294,13 +334,17 @@
                 
                 const downloadLink = document.createElement('a');
                 downloadLink.href = URL.createObjectURL(blob);
-                downloadLink.download = `${className}-content.rss`;
+                downloadLink.download = `${sanitizeText(className)}-content.rss`;
                 
                 document.body.appendChild(downloadLink);
                 downloadLink.click();
                 document.body.removeChild(downloadLink);
                 
                 URL.revokeObjectURL(downloadLink.href);
+                
+                console.log('✅ Download triggered successfully');
+                console.log(`📁 Filename: ${className}-content.rss`);
+                console.log(`📊 Total items: ${elements.length}`);
                 
                 // Show success toast
                 const toast = document.createElement('div');
@@ -315,15 +359,26 @@
                             <path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path>
                         </svg>
                     </span>
-                    <span class="Toast-content">Downloaded ${className}-content.rss</span>
+                    <span class="Toast-content">Downloaded ${sanitizeText(className)}-content.rss (${elements.length} items)</span>
                 `;
                 
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
+                
+                console.log('🎉 Process completed successfully!');
+                
             } catch (error) {
-                console.error('Download error:', error);
+                console.error('❌ Error during RSS generation:', error);
+                console.error('Error details:', {
+                    className,
+                    elementsCount: elements.length,
+                    errorMessage: error.message,
+                    errorStack: error.stack
+                });
                 alert('Failed to download RSS file. Check console for details.');
             }
+            
+            console.groupEnd();
         }
 
         function updateClassesList(classes) {
