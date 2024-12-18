@@ -382,6 +382,8 @@
         }
 
         function updateClassesList(classes) {
+            console.log('Available classes:', classes);
+            
             const classesList = document.getElementById('classesList');
             const classCount = document.getElementById('classCount');
             
@@ -397,60 +399,90 @@
             classCount.textContent = classes.length;
             
             const classesHtml = classes.map(classInfo => {
-                const elementsJson = JSON.stringify(classInfo.elements)
-                    .replace(/"/g, '&quot;');
-                
-                return `
-                    <div class="Box-row">
-                        <div class="d-flex flex-items-center justify-content-between">
-                            <div class="d-flex flex-items-center flex-grow-1">
-                                <span id="arrow-${classInfo.name}" 
-                                       class="mr-2 color-fg-muted" 
-                                       style="cursor: pointer; user-select: none;"
-                                       onclick="toggleClassContent('${classInfo.name}')">▶</span>
-                                <span class="Label Label--outline mr-2" 
-                                      onclick="toggleClassContent('${classInfo.name}')" 
-                                      style="cursor: pointer;">
-                                    ${escapeXml(classInfo.name)}
-                                </span>
-                                <span class="Counter mr-2">${classInfo.count}</span>
-                            </div>
-                            <button class="btn btn-sm btn-invisible" 
-                                    onclick='downloadAsRss("${escapeXml(classInfo.name)}", ${elementsJson})'
-                                    title="Download RSS">
-                                <svg class="octicon" xmlns="http://www.w3.org/2000/svg" 
-                                     viewBox="0 0 16 16" width="16" height="16">
-                                    <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path>
-                                    <path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <div id="content-${classInfo.name}" 
-                             style="display: none;">
-                            <div class="color-bg-subtle rounded-2 mt-2 p-3">
-                                <ul class="list-style-none mb-0 text-left">
-                                    ${classInfo.elements.map((element, index) => `
-                                        <li class="${index !== classInfo.elements.length - 1 ? 'mb-2' : ''}">
-                                            <div class="d-flex" style="align-items: flex-start;">
-                                                <div class="color-fg-accent mr-2 mt-1">•</div>
-                                                <div class="color-fg-muted" 
-                                                     style="word-break: break-word; text-align: left; flex: 1;">
-                                                    ${element.text}
-                                                </div>
-                                            </div>
-                                            ${index !== classInfo.elements.length - 1 ? 
-                                                '<div class="border-bottom my-2"></div>' : 
-                                                ''}
-                                        </li>
-                                    `).join('')}
-                                </ul>
+                try {
+                    // Sanitize and prepare elements data
+                    const safeElements = classInfo.elements.map(el => ({
+                        text: sanitizeText(el.text || '')
+                            .replace(/\n/g, ' ')  // Replace newlines with spaces
+                            .replace(/\r/g, '')   // Remove carriage returns
+                            .replace(/\t/g, ' ')  // Replace tabs with spaces
+                            .replace(/\s+/g, ' ') // Normalize spaces
+                            .trim(),
+                        link: sanitizeText(el.link || '').trim()
+                    }));
+
+                    // Encode the data for the HTML attribute
+                    const encodedData = encodeURIComponent(JSON.stringify(safeElements));
+
+                    return `
+                        <div class="Box-row">
+                            <div class="d-flex flex-items-center justify-content-between">
+                                <div class="d-flex flex-items-center flex-grow-1">
+                                    <span id="arrow-${classInfo.name}" 
+                                           class="mr-2 color-fg-muted" 
+                                           style="cursor: pointer; user-select: none;"
+                                           onclick="toggleClassContent('${classInfo.name}')">▶</span>
+                                    <span class="Label Label--outline mr-2" 
+                                          onclick="toggleClassContent('${classInfo.name}')" 
+                                          style="cursor: pointer;">
+                                        ${sanitizeText(classInfo.name)}
+                                    </span>
+                                    <span class="Counter mr-2">${classInfo.count}</span>
+                                </div>
+                                <button class="btn btn-sm btn-invisible" 
+                                        onclick="handleDownload('${classInfo.name}')"
+                                        data-elements="${encodedData}"
+                                        title="Download RSS">
+                                    <svg class="octicon" xmlns="http://www.w3.org/2000/svg" 
+                                         viewBox="0 0 16 16" width="16" height="16">
+                                        <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path>
+                                        <path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } catch (error) {
+                    console.error('Error processing class:', classInfo.name, error);
+                    return '';
+                }
             }).join('');
             
             classesList.innerHTML = classesHtml;
+        }
+
+        function handleDownload(className) {
+            console.log('Download triggered for class:', className);
+            
+            try {
+                const button = document.querySelector(`button[onclick="handleDownload('${className}')"]`);
+                if (!button) {
+                    throw new Error('Button not found');
+                }
+
+                const encodedData = button.getAttribute('data-elements');
+                if (!encodedData) {
+                    throw new Error('No elements data found');
+                }
+
+                console.log('Processing encoded data...');
+                const decodedData = decodeURIComponent(encodedData);
+                console.log('Decoded data length:', decodedData.length);
+                
+                const elements = JSON.parse(decodedData);
+                console.log('Successfully parsed elements:', elements);
+                
+                downloadAsRss(className, elements);
+            } catch (error) {
+                console.error('Error in handleDownload:', error);
+                console.error('Error details:', {
+                    className,
+                    errorType: error.name,
+                    errorMessage: error.message,
+                    errorStack: error.stack
+                });
+                alert('Failed to process download. Check console for details.');
+            }
         }
 
         function loadURL() {
