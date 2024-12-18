@@ -8,6 +8,25 @@
     <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .claude-highlight {
+            outline: 3px solid #f1c40f !important;
+            background-color: rgba(241, 196, 15, 0.3) !important;
+            transition: all 0.3s ease !important;
+            position: relative !important;
+            z-index: 10000 !important;
+        }
+
+        @keyframes pulse {
+            0% { outline-color: rgba(241, 196, 15, 1); }
+            50% { outline-color: rgba(241, 196, 15, 0.5); }
+            100% { outline-color: rgba(241, 196, 15, 1); }
+        }
+
+        .claude-highlight {
+            animation: pulse 2s infinite;
+        }
+    </style>
 </head>
 <body>
     <div class="container-lg px-3 my-3 markdown-body">
@@ -113,6 +132,67 @@
                 }));
         }
 
+        function injectStyles(frameDoc) {
+            const style = frameDoc.createElement('style');
+            style.textContent = `
+                .claude-highlight {
+                    outline: 3px solid #f1c40f !important;
+                    background-color: rgba(241, 196, 15, 0.3) !important;
+                    transition: all 0.3s ease !important;
+                    position: relative !important;
+                    z-index: 10000 !important;
+                    animation: pulse 2s infinite !important;
+                }
+
+                @keyframes pulse {
+                    0% { outline-color: rgba(241, 196, 15, 1); }
+                    50% { outline-color: rgba(241, 196, 15, 0.5); }
+                    100% { outline-color: rgba(241, 196, 15, 1); }
+                }
+            `;
+            frameDoc.head.appendChild(style);
+        }
+
+        function highlightElements(className) {
+            try {
+                const frame = document.getElementById('urlFrame');
+                const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                
+                // Inject styles if they don't exist
+                if (!frameDoc.querySelector('style')) {
+                    injectStyles(frameDoc);
+                }
+                
+                // Remove previous highlights
+                const previousHighlights = frameDoc.querySelectorAll('.claude-highlight');
+                previousHighlights.forEach(el => {
+                    el.classList.remove('claude-highlight');
+                    el.style.removeProperty('z-index');
+                });
+                
+                // Add new highlights
+                const elements = frameDoc.getElementsByClassName(className);
+                if (elements.length > 0) {
+                    Array.from(elements).forEach(el => {
+                        el.classList.add('claude-highlight');
+                        el.style.zIndex = '10000';
+                    });
+                    
+                    // Scroll first element into view
+                    elements[0].scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    
+                    console.log(`Highlighted ${elements.length} elements with class ${className}`);
+                } else {
+                    console.log(`No elements found with class ${className}`);
+                }
+            } catch (e) {
+                console.error('Error highlighting elements:', e);
+            }
+        }
+
         function toggleClassContent(className) {
             const contentDiv = document.getElementById(`content-${className}`);
             const arrow = document.getElementById(`arrow-${className}`);
@@ -120,9 +200,22 @@
             if (contentDiv.style.display === 'none' || !contentDiv.style.display) {
                 contentDiv.style.display = 'block';
                 arrow.innerHTML = '▼';
+                highlightElements(className);
             } else {
                 contentDiv.style.display = 'none';
                 arrow.innerHTML = '▶';
+                // Remove highlights when closing
+                try {
+                    const frame = document.getElementById('urlFrame');
+                    const doc = frame.contentDocument || frame.contentWindow.document;
+                    const elements = doc.getElementsByClassName(className);
+                    Array.from(elements).forEach(el => {
+                        el.classList.remove('claude-highlight');
+                        el.style.removeProperty('z-index');
+                    });
+                } catch (e) {
+                    console.error('Cannot access iframe content:', e);
+                }
             }
         }
 
@@ -147,7 +240,8 @@
                         <div class="d-flex flex-items-center flex-grow-1">
                             <span id="arrow-${classInfo.name}" 
                                    class="mr-2 color-fg-muted" 
-                                   style="cursor: pointer; user-select: none;">▶</span>
+                                   style="cursor: pointer; user-select: none;"
+                                   onclick="toggleClassContent('${classInfo.name}')">▶</span>
                             <span class="Label Label--outline mr-2" 
                                   onclick="toggleClassContent('${classInfo.name}')" 
                                   style="cursor: pointer;">
@@ -207,11 +301,8 @@
                 const loadingMsg = document.getElementById('loadingMessage');
                 const directLink = document.getElementById('directLink');
 
-                // Show loading message
                 loadingMsg.style.display = 'block';
                 errorMsg.style.display = 'none';
-                
-                // Update direct link
                 directLink.href = url;
 
                 // First, fetch the HTML to extract classes
@@ -223,17 +314,18 @@
                     })
                     .catch(console.error);
 
-                // Load the page in the iframe
+                // Load the page in the iframe with necessary permissions
                 frame.src = `/proxy?url=${encodeURIComponent(url)}`;
+                frame.setAttribute('sandbox', 'allow-same-origin allow-scripts allow-popups allow-forms');
                 
                 frame.onload = function() {
                     loadingMsg.style.display = 'none';
                     try {
-                        if (frame.contentDocument.body === null) {
-                            showError();
-                        }
+                        // Inject styles after frame loads
+                        const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                        injectStyles(frameDoc);
                     } catch (e) {
-                        showError();
+                        console.error('Cannot inject styles:', e);
                     }
                 };
 
