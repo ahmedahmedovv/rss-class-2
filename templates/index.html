@@ -97,7 +97,9 @@
             });
             
             return Array.from(classInfo.entries())
-                .filter(([_, info]) => info.count > 1)
+                .filter(([_, info]) => {
+                    return info.count > 1 && info.texts.size > 0;
+                })
                 .sort((a, b) => {
                     if (b[1].count !== a[1].count) {
                         return b[1].count - a[1].count;
@@ -131,7 +133,7 @@
             if (classes.length === 0) {
                 classesList.innerHTML = `
                     <div class="blankslate">
-                        <p>No repeated classes found</p>
+                        <p>No classes with content found</p>
                     </div>`;
                 classCount.textContent = '0';
                 return;
@@ -139,59 +141,51 @@
 
             classCount.textContent = classes.length;
             
-            const classesHtml = classes.map(classInfo => {
-                const hasContent = classInfo.texts.length > 0;
-                
-                return `
-                    <div class="Box-row">
-                        <div class="d-flex flex-items-center justify-content-between">
-                            <div class="d-flex flex-items-center flex-grow-1">
-                                ${hasContent ? 
-                                    `<span id="arrow-${classInfo.name}" 
-                                           class="mr-2 color-fg-muted" 
-                                           style="cursor: pointer; user-select: none;">▶</span>` 
-                                    : '<span class="mr-2 color-fg-muted">•</span>'}
-                                <span class="Label Label--outline mr-2" 
-                                      ${hasContent ? `onclick="toggleClassContent('${classInfo.name}')" 
-                                      style="cursor: pointer;"` : ''}>
-                                    ${classInfo.name}
-                                </span>
-                                <span class="Counter mr-2">${classInfo.count}</span>
-                            </div>
-                            <button class="btn btn-sm btn-invisible" 
-                                    onclick="copyToClipboard('${classInfo.name}')">
-                                <svg class="octicon" xmlns="http://www.w3.org/2000/svg" 
-                                     viewBox="0 0 16 16" width="16" height="16">
-                                    <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
-                                </svg>
-                            </button>
+            const classesHtml = classes.map(classInfo => `
+                <div class="Box-row">
+                    <div class="d-flex flex-items-center justify-content-between">
+                        <div class="d-flex flex-items-center flex-grow-1">
+                            <span id="arrow-${classInfo.name}" 
+                                   class="mr-2 color-fg-muted" 
+                                   style="cursor: pointer; user-select: none;">▶</span>
+                            <span class="Label Label--outline mr-2" 
+                                  onclick="toggleClassContent('${classInfo.name}')" 
+                                  style="cursor: pointer;">
+                                ${classInfo.name}
+                            </span>
+                            <span class="Counter mr-2">${classInfo.count}</span>
                         </div>
-                        ${hasContent ? `
-                            <div id="content-${classInfo.name}" 
-                                 style="display: none;">
-                                <div class="color-bg-subtle rounded-2 mt-2 p-3">
-                                    <ul class="list-style-none mb-0 text-left">
-                                        ${classInfo.texts.map((text, index) => `
-                                            <li class="${index !== classInfo.texts.length - 1 ? 'mb-2' : ''}">
-                                                <div class="d-flex" style="align-items: flex-start;">
-                                                    <div class="color-fg-accent mr-2 mt-1">•</div>
-                                                    <div class="color-fg-muted" 
-                                                         style="word-break: break-word; text-align: left; flex: 1;">
-                                                        ${text}
-                                                    </div>
-                                                </div>
-                                                ${index !== classInfo.texts.length - 1 ? 
-                                                    '<div class="border-bottom my-2"></div>' : 
-                                                    ''}
-                                            </li>
-                                        `).join('')}
-                                    </ul>
-                                </div>
-                            </div>
-                        ` : ''}
+                        <button class="btn btn-sm btn-invisible" 
+                                onclick="copyToClipboard('${classInfo.name}')">
+                            <svg class="octicon" xmlns="http://www.w3.org/2000/svg" 
+                                 viewBox="0 0 16 16" width="16" height="16">
+                                <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+                            </svg>
+                        </button>
                     </div>
-                `;
-            }).join('');
+                    <div id="content-${classInfo.name}" 
+                         style="display: none;">
+                        <div class="color-bg-subtle rounded-2 mt-2 p-3">
+                            <ul class="list-style-none mb-0 text-left">
+                                ${classInfo.texts.map((text, index) => `
+                                    <li class="${index !== classInfo.texts.length - 1 ? 'mb-2' : ''}">
+                                        <div class="d-flex" style="align-items: flex-start;">
+                                            <div class="color-fg-accent mr-2 mt-1">•</div>
+                                            <div class="color-fg-muted" 
+                                                 style="word-break: break-word; text-align: left; flex: 1;">
+                                                ${text}
+                                            </div>
+                                        </div>
+                                        ${index !== classInfo.texts.length - 1 ? 
+                                            '<div class="border-bottom my-2"></div>' : 
+                                            ''}
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
             
             classesList.innerHTML = classesHtml;
         }
