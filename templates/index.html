@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Primer App</title>
+    <!-- Include Primer CSS -->
+    <link href="https://unpkg.com/@primer/css@^20.2.4/dist/primer.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container-lg px-3 my-5 markdown-body">
+        <div class="Box p-6">
+            <h1 class="h1">Hello World!</h1>
+            <p class="color-fg-muted">Welcome to my Flask app with Primer styling</p>
+            <button class="btn btn-primary">Primer Button</button>
+        </div>
+    </div>
+</body>
+</html> 
