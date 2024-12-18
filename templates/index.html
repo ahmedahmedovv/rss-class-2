@@ -92,6 +92,38 @@
             loadingMsg.style.display = 'none';
         }
 
+        function getElementXPath(element) {
+            const idx = (sib, name) => sib 
+                ? idx(sib.previousElementSibling, name||sib.tagName) + (sib.tagName == name)
+                : 1;
+            const segs = elm => !elm || elm.nodeType !== 1 
+                ? ['']
+                : elm.id && document.getElementById(elm.id) === elm
+                    ? [`id("${elm.id}")`]
+                    : [...segs(elm.parentNode), `${elm.tagName}[${idx(elm)}]`];
+            return segs(element).join('/');
+        }
+
+        function findParentLink(element) {
+            // Check if element itself is a link
+            if (element.tagName === 'A' && element.href) {
+                return element.href;
+            }
+            
+            // Check if element has a parent link
+            let parent = element.parentElement;
+            while (parent) {
+                if (parent.tagName === 'A' && parent.href) {
+                    return parent.href;
+                }
+                parent = parent.parentElement;
+            }
+            
+            // Check if element contains a link
+            const childLink = element.querySelector('a');
+            return childLink ? childLink.href : null;
+        }
+
         function extractClasses(html) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
@@ -102,7 +134,7 @@
                     if (!classInfo.has(className)) {
                         classInfo.set(className, {
                             count: 0,
-                            texts: new Set()
+                            elements: []
                         });
                     }
                     const info = classInfo.get(className);
@@ -110,25 +142,25 @@
                     
                     const text = element.textContent.trim();
                     if (text && text.length < 100) {
-                        info.texts.add(text);
+                        const link = findParentLink(element);
+                        info.elements.push({
+                            text: text,
+                            xpath: getElementXPath(element),
+                            tag: element.tagName.toLowerCase(),
+                            classes: Array.from(element.classList).join(' '),
+                            link: link || ''
+                        });
                     }
                 });
             });
             
             return Array.from(classInfo.entries())
-                .filter(([_, info]) => {
-                    return info.count > 1 && info.texts.size > 0;
-                })
-                .sort((a, b) => {
-                    if (b[1].count !== a[1].count) {
-                        return b[1].count - a[1].count;
-                    }
-                    return a[0].localeCompare(b[0]);
-                })
+                .filter(([_, info]) => info.count > 1 && info.elements.length > 0)
+                .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
                 .map(([className, info]) => ({
                     name: className,
                     count: info.count,
-                    texts: Array.from(info.texts)
+                    elements: info.elements
                 }));
         }
 
@@ -228,17 +260,16 @@
                 .replace(/'/g, '&apos;');
         }
 
-        function downloadAsRss(className, textsArray) {
+        function downloadAsRss(className, elements) {
             try {
-                // Get current date in RFC 822 format
                 const pubDate = new Date().toUTCString();
+                const pageUrl = document.getElementById('urlInput').value;
                 
-                // Create RSS content
                 const rssContent = `<?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
     <channel>
         <title>Class Content: ${escapeXml(className)}</title>
-        <link>${window.location.href}</link>
+        <link>${escapeXml(pageUrl)}</link>
         <description>Content found for class '${escapeXml(className)}'</description>
         <language>en-us</language>
         <pubDate>${pubDate}</pubDate>
@@ -246,35 +277,43 @@
         <generator>Class Content Extractor</generator>
         <ttl>60</ttl>
         
-        ${textsArray.map((text, index) => `
+        ${elements.map((element, index) => `
         <item>
-            <title>Content ${index + 1}</title>
-            <description>${escapeXml(text)}</description>
-            <guid>item-${className}-${index}</guid>
+            <title>Element ${index + 1}: ${escapeXml(element.tag)}</title>
+            <description>${escapeXml(element.text)}</description>
+            <link>${escapeXml(element.link)}</link>
+            <content:encoded><![CDATA[
+                Element Details:
+                - Text: ${element.text}
+                - Tag: ${element.tag}
+                - Classes: ${element.classes}
+                - XPath: ${element.xpath}
+                - URL: ${element.link || 'No link found'}
+            ]]></content:encoded>
+            <guid isPermaLink="${element.link ? 'true' : 'false'}">${
+                element.link || `item-${className}-${index}-${Date.now()}`
+            }</guid>
             <pubDate>${pubDate}</pubDate>
         </item>`).join('\n        ')}
     </channel>
 </rss>`;
                 
-                // Create blob with RSS content
+                // Create and trigger download
                 const blob = new Blob([rssContent], { 
                     type: 'application/rss+xml;charset=utf-8'
                 });
                 
-                // Create download link
                 const downloadLink = document.createElement('a');
                 downloadLink.href = URL.createObjectURL(blob);
                 downloadLink.download = `${className}-content.rss`;
                 
-                // Add to document, click, and remove
                 document.body.appendChild(downloadLink);
                 downloadLink.click();
                 document.body.removeChild(downloadLink);
                 
-                // Cleanup
                 URL.revokeObjectURL(downloadLink.href);
                 
-                // Show feedback toast
+                // Show success toast
                 const toast = document.createElement('div');
                 toast.className = 'Toast Toast--success';
                 toast.style.position = 'fixed';
@@ -314,8 +353,7 @@
             classCount.textContent = classes.length;
             
             const classesHtml = classes.map(classInfo => {
-                // Prepare texts array for safe handling
-                const textsJson = JSON.stringify(classInfo.texts)
+                const elementsJson = JSON.stringify(classInfo.elements)
                     .replace(/"/g, '&quot;');
                 
                 return `
@@ -334,7 +372,7 @@
                                 <span class="Counter mr-2">${classInfo.count}</span>
                             </div>
                             <button class="btn btn-sm btn-invisible" 
-                                    onclick='downloadAsRss("${escapeXml(classInfo.name)}", ${textsJson})'
+                                    onclick='downloadAsRss("${escapeXml(classInfo.name)}", ${elementsJson})'
                                     title="Download RSS">
                                 <svg class="octicon" xmlns="http://www.w3.org/2000/svg" 
                                      viewBox="0 0 16 16" width="16" height="16">
@@ -347,16 +385,16 @@
                              style="display: none;">
                             <div class="color-bg-subtle rounded-2 mt-2 p-3">
                                 <ul class="list-style-none mb-0 text-left">
-                                    ${classInfo.texts.map((text, index) => `
-                                        <li class="${index !== classInfo.texts.length - 1 ? 'mb-2' : ''}">
+                                    ${classInfo.elements.map((element, index) => `
+                                        <li class="${index !== classInfo.elements.length - 1 ? 'mb-2' : ''}">
                                             <div class="d-flex" style="align-items: flex-start;">
                                                 <div class="color-fg-accent mr-2 mt-1">•</div>
                                                 <div class="color-fg-muted" 
                                                      style="word-break: break-word; text-align: left; flex: 1;">
-                                                    ${text}
+                                                    ${element.text}
                                                 </div>
                                             </div>
-                                            ${index !== classInfo.texts.length - 1 ? 
+                                            ${index !== classInfo.elements.length - 1 ? 
                                                 '<div class="border-bottom my-2"></div>' : 
                                                 ''}
                                         </li>
