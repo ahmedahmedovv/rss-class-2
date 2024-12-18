@@ -266,7 +266,7 @@
                 const pageUrl = document.getElementById('urlInput').value;
                 
                 const rssContent = `<?xml version="1.0" encoding="UTF-8" ?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0">
     <channel>
         <title>Class Content: ${escapeXml(className)}</title>
         <link>${escapeXml(pageUrl)}</link>
@@ -275,24 +275,13 @@
         <pubDate>${pubDate}</pubDate>
         <lastBuildDate>${pubDate}</lastBuildDate>
         <generator>Class Content Extractor</generator>
-        <ttl>60</ttl>
         
         ${elements.map((element, index) => `
         <item>
-            <title>Element ${index + 1}: ${escapeXml(element.tag)}</title>
-            <description>${escapeXml(element.text)}</description>
+            <title>${escapeXml(element.text)}</title>
             <link>${escapeXml(element.link)}</link>
-            <content:encoded><![CDATA[
-                Element Details:
-                - Text: ${element.text}
-                - Tag: ${element.tag}
-                - Classes: ${element.classes}
-                - XPath: ${element.xpath}
-                - URL: ${element.link || 'No link found'}
-            ]]></content:encoded>
-            <guid isPermaLink="${element.link ? 'true' : 'false'}">${
-                element.link || `item-${className}-${index}-${Date.now()}`
-            }</guid>
+            <description>${escapeXml(element.text)}</description>
+            <guid isPermaLink="true">${escapeXml(element.link)}</guid>
             <pubDate>${pubDate}</pubDate>
         </item>`).join('\n        ')}
     </channel>
