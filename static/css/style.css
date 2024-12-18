@@ -1,8 +1,26 @@
 .markdown-body {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
 }
 
 .Box {
     text-align: center;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#urlInput {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    margin-right: 8px;
+}
+
+iframe {
+    background: #f6f8fa;
 } 
