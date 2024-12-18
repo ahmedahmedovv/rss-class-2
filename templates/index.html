@@ -24,29 +24,70 @@
                 </div>
             </div>
             
-            <!-- Right Panel - made wider -->
+            <!-- Right Panel with improved error handling -->
             <div class="Box p-3" style="width: 80%;">
                 <iframe id="urlFrame" width="100%" 
-                        src="about:blank" frameborder="0"></iframe>
+                        src="about:blank" 
+                        frameborder="0"
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                        onerror="handleFrameError()"></iframe>
+                <div id="errorMessage" class="flash flash-error mt-3" style="display: none;">
+                    <p class="mb-2">This website cannot be displayed in an iframe due to security restrictions.</p>
+                    <a id="directLink" href="#" target="_blank" class="btn btn-sm btn-primary">Open in New Tab</a>
+                </div>
+                <div id="loadingMessage" class="flash flash-warn mt-3" style="display: none;">
+                    Loading...
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        function handleFrameError() {
+            showError();
+        }
+
+        function showError() {
+            const frame = document.getElementById('urlFrame');
+            const errorMsg = document.getElementById('errorMessage');
+            const loadingMsg = document.getElementById('loadingMessage');
+            
+            frame.src = 'about:blank';
+            errorMsg.style.display = 'block';
+            loadingMsg.style.display = 'none';
+        }
+
         function loadURL() {
             const url = document.getElementById('urlInput').value;
-            if (url) {
-                // Validate URL
-                try {
-                    new URL(url);
-                    document.getElementById('urlFrame').src = url;
-                } catch (e) {
-                    alert('Please enter a valid URL starting with http:// or https://');
-                }
+            if (!url) return;
+
+            try {
+                const urlObj = new URL(url);
+                const frame = document.getElementById('urlFrame');
+                const errorMsg = document.getElementById('errorMessage');
+                const loadingMsg = document.getElementById('loadingMessage');
+                const directLink = document.getElementById('directLink');
+
+                // Show loading message
+                loadingMsg.style.display = 'block';
+                errorMsg.style.display = 'none';
+                
+                // Update direct link
+                directLink.href = url;
+
+                // Use proxy endpoint
+                frame.src = `/proxy?url=${encodeURIComponent(url)}`;
+                
+                frame.onload = function() {
+                    loadingMsg.style.display = 'none';
+                };
+
+            } catch (e) {
+                alert('Please enter a valid URL starting with http:// or https://');
             }
         }
 
-        // Allow Enter key to trigger the button
+        // Add event listener for Enter key
         document.getElementById('urlInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 loadURL();
