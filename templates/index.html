@@ -12,8 +12,8 @@
 <body>
     <div class="container-lg px-3 my-3 markdown-body">
         <div class="d-flex flex-row full-height">
-            <!-- Left Panel - made even narrower -->
-            <div class="Box p-4 mr-3" style="width: 20%;">
+            <!-- Left Panel - increased from 20% to 35% -->
+            <div class="Box p-4 mr-3" style="width: 35%;">
                 <h1 class="h3 mb-3">URL Opener</h1>
                 <div class="form-group">
                     <div class="input-group">
@@ -22,18 +22,34 @@
                         <button class="btn btn-primary ml-2" onclick="loadURL()">Open</button>
                     </div>
                 </div>
+                
+                <!-- Classes Panel -->
+                <div class="classes-panel">
+                    <h2 class="h4 mb-2">Page Classes</h2>
+                    <div class="Box">
+                        <div class="Box-header">
+                            <h3 class="Box-title">Found Classes</h3>
+                            <span id="classCount" class="Counter">0</span>
+                        </div>
+                        <div id="classesList" class="Box-body overflow-auto" style="max-height: 70vh;">
+                            <div class="blankslate">
+                                <p>Load a page to see classes</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
-            <!-- Right Panel with improved error handling -->
-            <div class="Box p-3" style="width: 80%;">
+            <!-- Right Panel - decreased from 80% to 65% -->
+            <div class="Box p-3" style="width: 65%;">
                 <iframe id="urlFrame" width="100%" 
                         src="about:blank" 
                         frameborder="0"
                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                         onerror="handleFrameError()"></iframe>
                 <div id="errorMessage" class="flash flash-error mt-3" style="display: none;">
-                    <p class="mb-2">This website cannot be displayed in an iframe due to security restrictions.</p>
-                    <a id="directLink" href="#" target="_blank" class="btn btn-sm btn-primary">Open in New Tab</a>
+                    This website cannot be displayed in an iframe due to security restrictions.
+                    <a id="directLink" href="#" target="_blank" class="btn btn-sm ml-2">Open in New Tab</a>
                 </div>
                 <div id="loadingMessage" class="flash flash-warn mt-3" style="display: none;">
                     Loading...
@@ -57,6 +73,135 @@
             loadingMsg.style.display = 'none';
         }
 
+        function extractClasses(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const classInfo = new Map();
+            
+            doc.querySelectorAll('*').forEach(element => {
+                element.classList.forEach(className => {
+                    if (!classInfo.has(className)) {
+                        classInfo.set(className, {
+                            count: 0,
+                            texts: new Set()
+                        });
+                    }
+                    const info = classInfo.get(className);
+                    info.count++;
+                    
+                    const text = element.textContent.trim();
+                    if (text && text.length < 100) {
+                        info.texts.add(text);
+                    }
+                });
+            });
+            
+            return Array.from(classInfo.entries())
+                .filter(([_, info]) => info.count > 1)
+                .sort((a, b) => {
+                    if (b[1].count !== a[1].count) {
+                        return b[1].count - a[1].count;
+                    }
+                    return a[0].localeCompare(b[0]);
+                })
+                .map(([className, info]) => ({
+                    name: className,
+                    count: info.count,
+                    texts: Array.from(info.texts)
+                }));
+        }
+
+        function toggleClassContent(className) {
+            const contentDiv = document.getElementById(`content-${className}`);
+            const arrow = document.getElementById(`arrow-${className}`);
+            
+            if (contentDiv.style.display === 'none' || !contentDiv.style.display) {
+                contentDiv.style.display = 'block';
+                arrow.innerHTML = '▼';
+            } else {
+                contentDiv.style.display = 'none';
+                arrow.innerHTML = '▶';
+            }
+        }
+
+        function updateClassesList(classes) {
+            const classesList = document.getElementById('classesList');
+            const classCount = document.getElementById('classCount');
+            
+            if (classes.length === 0) {
+                classesList.innerHTML = `
+                    <div class="blankslate">
+                        <p>No repeated classes found</p>
+                    </div>`;
+                classCount.textContent = '0';
+                return;
+            }
+
+            classCount.textContent = classes.length;
+            
+            const classesHtml = classes.map(classInfo => {
+                const hasContent = classInfo.texts.length > 0;
+                
+                return `
+                    <div class="Box-row">
+                        <div class="d-flex flex-items-center justify-content-between">
+                            <div class="d-flex flex-items-center flex-grow-1">
+                                ${hasContent ? 
+                                    `<span id="arrow-${classInfo.name}" 
+                                           class="mr-2 color-fg-muted" 
+                                           style="cursor: pointer; user-select: none;">▶</span>` 
+                                    : '<span class="mr-2 color-fg-muted">•</span>'}
+                                <span class="Label Label--outline mr-2" 
+                                      ${hasContent ? `onclick="toggleClassContent('${classInfo.name}')" 
+                                      style="cursor: pointer;"` : ''}>
+                                    ${classInfo.name}
+                                </span>
+                                <span class="Counter mr-2">${classInfo.count}</span>
+                            </div>
+                            <button class="btn btn-sm btn-invisible" 
+                                    onclick="copyToClipboard('${classInfo.name}')">
+                                <svg class="octicon" xmlns="http://www.w3.org/2000/svg" 
+                                     viewBox="0 0 16 16" width="16" height="16">
+                                    <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        ${hasContent ? `
+                            <div id="content-${classInfo.name}" 
+                                 style="display: none;">
+                                <div class="color-bg-subtle rounded-2 mt-2 p-3">
+                                    <ul class="list-style-none mb-0 text-left">
+                                        ${classInfo.texts.map((text, index) => `
+                                            <li class="${index !== classInfo.texts.length - 1 ? 'mb-2' : ''}">
+                                                <div class="d-flex" style="align-items: flex-start;">
+                                                    <div class="color-fg-accent mr-2 mt-1">•</div>
+                                                    <div class="color-fg-muted" 
+                                                         style="word-break: break-word; text-align: left; flex: 1;">
+                                                        ${text}
+                                                    </div>
+                                                </div>
+                                                ${index !== classInfo.texts.length - 1 ? 
+                                                    '<div class="border-bottom my-2"></div>' : 
+                                                    ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            classesList.innerHTML = classesHtml;
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Could add a toast notification here
+            });
+        }
+
         function loadURL() {
             const url = document.getElementById('urlInput').value;
             if (!url) return;
@@ -75,11 +220,27 @@
                 // Update direct link
                 directLink.href = url;
 
-                // Use proxy endpoint
+                // First, fetch the HTML to extract classes
+                fetch(`/proxy?url=${encodeURIComponent(url)}`)
+                    .then(response => response.text())
+                    .then(html => {
+                        const classes = extractClasses(html);
+                        updateClassesList(classes);
+                    })
+                    .catch(console.error);
+
+                // Load the page in the iframe
                 frame.src = `/proxy?url=${encodeURIComponent(url)}`;
                 
                 frame.onload = function() {
                     loadingMsg.style.display = 'none';
+                    try {
+                        if (frame.contentDocument.body === null) {
+                            showError();
+                        }
+                    } catch (e) {
+                        showError();
+                    }
                 };
 
             } catch (e) {
